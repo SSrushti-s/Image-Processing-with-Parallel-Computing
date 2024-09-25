@@ -4,7 +4,7 @@
 
 * This was a class project for a High Performance Computing class that I am taking that I found really interesting and decided to explore further.
 
-* The main focus of the project was to investigate how parallel programming with OpenMp optimizes such tasks, especially where large images are involved. That explains the timing part and the ' #pragma omp parallel for' syntax.
+* The main focus of the project was to investigate how parallel programming with OpenMp optimizes such tasks, especially where large images are involved.
 
 * I compiled and executed the program via a virtual GPU powered computer (virtual computer lab environment) provided by my school for HPC students. 
 
