@@ -7,228 +7,166 @@
 #include <chrono>
 #include <omp.h>
 
-
 using namespace std;
 
-/*This programs opens a pgm image, reads it, processes it as desired, and writes back its processed pixel values as a pgm image.
-
-
-
-/* 3 by 3 edge detection convolution filter(kernel); can change its values for other various convolution purposes such as blurring. sharpening, etc.*/
-
-double edgeDetection[3][3]={-0.0625,-0.0625,-0.0625,-0.0625,0.5,-0.0625,-0.0625,-0.0625,-0.0625};
+// 3 by 3 edge detection convolution filter (kernel)
+double edgeDetection[3][3] = {
+    {-0.0625, -0.0625, -0.0625},
+    {-0.0625,  0.5,    -0.0625},
+    {-0.0625, -0.0625, -0.0625}
+};
 
 // Function that implements the application of the filter on every pixel of the image
-double applyConvolution(std::vector<std::vector<int>>& matrix, size_t& x, size_t& y) {
-  double result = 0;
-
-  for (int i=0; i<3; i++) {
-    for (int j=0; j<3; j++) {
-      result += edgeDetection[i][j] * matrix[x - 1 + i][y - 1 + j];
+double applyConvolution(std::vector<std::vector<int>>& matrix, size_t x, size_t y) {
+    double result = 0;
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            result += edgeDetection[i][j] * matrix[x - 1 + i][y - 1 + j];
+        }
     }
-  }
-
-  if (result < 0) return 0;
-  return result;
+    if (result < 0) return 0;
+    return result;
 }
 
-// Function to write out the final image pixels after processing to a pgm file
-bool writeResults(std::string& header, std::string& result) {
-  ofstream writeFile;
-  writeFile.open ("./imageprocessed.pgm");
-
-  writeFile << header.c_str() << "\n";
-  writeFile << result.c_str() << "\n";
-
-  writeFile.close();}
-
-
-//Function to read the pixels of the original image and apply zero padding in preparation for convolution
-  std::vector<std::vector<int>> fillPixelMatrix(int& numColumns, std::ifstream& image) {
-  int i = 0;
-  int j = 0;
-
-  std::vector<std::vector<int>> pixels;
-  std::vector<int> row;
-  std::vector<int> padding(numColumns + 2, 0);
-
-  row.push_back(0);
-  pixels.push_back(padding);
-
-  std::string line;
-  while (getline(image, line)) {
-    std::stringstream linestream(line);
-    string pixel;
-    linestream >> pixel;
-
-    try
-    {
-      row.push_back(stoi(pixel));
+// Writes out the file as a clean, universally compatible Plain Text ASCII P2 file
+bool writeResults(std::string& header, std::vector<std::vector<int>>& resultMatrix) {
+    ofstream writeFile("./imageprocessed.pgm");
+    if (!writeFile.is_open()) {
+        std::cerr << "Failed to open output file." << std::endl;
+        return false;
     }
-    catch(const std::exception& e)
-    {
-      std::cerr << e.what() << '\n';
-      continue;
+    writeFile << header;
+    for (const auto& row : resultMatrix) {
+        for (int pixel : row) {
+            writeFile << pixel << "\n";
+        }
     }
-  
-    j++;
-    if (j >= numColumns) {
-      j = 0;
-      i++;
-
-      row.push_back(0);
-      pixels.push_back(row);
-      row.clear();
-      row.push_back(0);
-    }
-  }
-
-   pixels.push_back(padding);
-
-  return pixels;
+    writeFile.close();
+    return true;
 }
 
 int main(int argc, char *argv[]) {
     string imagepath;
-    std::cout << "Enter image path" << std::endl;
+    std::cout << "Enter image path:" << std::endl;
     cin >> imagepath;
 
-  std::ifstream image;
-  image.open(imagepath);
-
-  if(!image.is_open())
-  {
-    cout<<"Unable to open file."<<endl;
-    return 0;
-  }
-
-  string header;
-
-  string magic, comment, dimensions, maximumgrey, intensity;
-  getline(image, magic);
-  getline(image, comment);
-  getline(image, dimensions);
-  getline(image, maximumgrey);
-
-  header += magic + "\n" + comment + "\n" + dimensions + "\n" + maximumgrey + "\n";
-
-  int space = dimensions.find_first_of(" ");
-
-  string width = dimensions.substr(0, space);
-  string height = dimensions.substr(space + 1);
-
-  int columns = stoi(width);
-  int rows = stoi(height);
-
-  std::cout <<"Image Dimensions: " << dimensions <<std::endl;
-  
-  std::cout <<"Dimensions rows "<< rows <<std::endl;
-  std::cout <<"Dimensions columns "<< columns <<std::endl;
-
-  auto startReading = std::chrono::high_resolution_clock::now();
-
-  std::vector<std::vector<int>> pixels = fillPixelMatrix(columns, image);
- 
-  image.close();
-
-  auto stopReading = std::chrono::high_resolution_clock::now();
-  auto totalTimeReading = std::chrono::duration_cast<std::chrono::nanoseconds>(stopReading - startReading);
-  double totalReadingms = totalTimeReading.count()/1e+6;
-
-	cout << "Total time reading image:  " << totalTimeReading.count() << " -> " <<totalReadingms << " ms" << endl;
-	
-// after opening image and reading pixels, ask user for what they'd like to do with it
- 	
-  string iprocessing_type;
-  cout << "Please enter the desired type of image processing:" << endl;
-  cin >> iprocessing_type;
-  
-  for (int i = 0; i < iprocessing_type.length(); i++)
-  	{
-  		iprocessing_type[i] = tolower(iprocessing_type[i]);
-  	}
-  	
-
-  string results;
-
-  vector<vector<int>> result(rows, vector<int>(columns));
-  
-  
-  auto startProcessing = std::chrono::high_resolution_clock::now();
-
-  for(std::vector<std::vector<int>>::size_type x = 1; x != rows + 1; x++) {
-    std::vector<int> row;
-    
-    #pragma omp parallel for
-    for(std::vector<std::vector<int>>::size_type y = 1; y != columns + 1; y++) {
-        if (iprocessing_type == "edgedetection"){
-
-            // Convolution; the same can be duplicated for other types of convolutions
-            int r = round(applyConvolution(pixels, x, y));
-
-        result[x-1][y-1] = r;
-        }
-       // Brightening; darkening can be similarly applied by multiplying the pixes by a number less than 1
-          if (iprocessing_type == "brighten"){
-             int r = round((pixels[x-1][y-1])*1.5);
-             
-              // Max pixel values in pgm files is 255
-               if (r > 255 ){
-         result[x-1][y-1] = 255;
-         }
-                   else{ result[x-1][y-1] = r;}
-            }
-            
-   //Rotating by 180 degrees; other rotation angles can be achieved in a similar way by switching around the pixel values appropriately
-         if (iprocessing_type == "rotate"){
-           int r =  pixels[rows-x][columns-y];
-            result[x-1][y-1] = r;
-           }
-           
-           
-           //Vertical reflection; horizontal can be achieved similarly by subtracting from the rows pixels
-         if (iprocessing_type == "reflect"){
-          int r =  pixels[x][columns-y];
-            result[x-1][y-1] = r;
-           }
-         }
+    // Open in binary mode so we can safely parse P2 or P5 data structures
+    std::ifstream image(imagepath, std::ios::binary);
+    if (!image.is_open()) {
+        cout << "Unable to open file." << endl;
+        return 0;
     }
-  
-  
-  
-    
-  
-       
-  cout << "Image Processed!"<< endl;
-  auto stopProcessing = std::chrono::high_resolution_clock::now();
-  auto totalTimeProcessing = std::chrono::duration_cast<std::chrono::nanoseconds>(stopProcessing - startProcessing);
 
-  double totalms = totalTimeProcessing.count()/1e+6;
+    string magic, comment, dimensions, maximumgrey;
+    
+    // Read headers, ignoring trailing carriage returns safely
+    getline(image, magic); if(!magic.empty() && magic.back() == '\r') magic.pop_back();
+    
+    // Peak ahead to see if the second line is a comment or dimensions
+    streampos pos = image.tellg();
+    getline(image, comment); if(!comment.empty() && comment.back() == '\r') comment.pop_back();
+    if (comment[0] != '#') {
+        dimensions = comment;
+        comment = "# Processed with OpenMP";
+    } else {
+        getline(image, dimensions); if(!dimensions.empty() && dimensions.back() == '\r') dimensions.pop_back();
+    }
+    
+    getline(image, maximumgrey); if(!maximumgrey.empty() && maximumgrey.back() == '\r') maximumgrey.pop_back();
+
+    int space = dimensions.find_first_of(" \t");
+    string width = dimensions.substr(0, space);
+    string height = dimensions.substr(space + 1);
+
+    int columns = stoi(width);
+    int rows = stoi(height);
+
+    std::cout << "Format Type detected: " << magic << std::endl;
+    std::cout << "Dimensions rows: " << rows << std::endl;
+    std::cout << "Dimensions columns: " << columns << std::endl;
+
+    // Allocate matrix with zero-padding borders for convolution support
+    std::vector<std::vector<int>> pixels(rows + 2, std::vector<int>(columns + 2, 0));
+
+    auto startReading = std::chrono::high_resolution_clock::now();
+
+    if (magic == "P5") {
+        // High Performance parsing for Binary files
+        std::vector<unsigned char> buffer(rows * columns);
+        image.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
         
-	cout << "Total time processing image:  " << totalTimeProcessing.count() << " -> " << totalms << " ms" << endl;
- 
- 
-//preprocessing the values appropriately before applying the write function defined above	
-  int maxGreyValue = 0;  
-  for(std::vector<int>r : result) {
-    for(int pixel: r) {
-      if (pixel > maxGreyValue) {
-         maxGreyValue= pixel;
-      }
-      results += to_string(pixel) + "\n";
+        int idx = 0;
+        for (int r = 1; r <= rows; r++) {
+            for (int c = 1; c <= columns; c++) {
+                pixels[r][c] = buffer[idx++];
+            }
+        }
+    } else {
+        // Standby parser for Plain Text ASCII files
+        int val;
+        for (int r = 1; r <= rows; r++) {
+            for (int c = 1; c <= columns; c++) {
+                if (image >> val) {
+                    pixels[r][c] = val;
+                }
+            }
+        }
     }
-  }
+    image.close();
+
+    auto stopReading = std::chrono::high_resolution_clock::now();
+    double totalReadingms = std::chrono::duration_cast<std::chrono::nanoseconds>(stopReading - startReading).count() / 1e+6;
+    cout << "Total time reading image: " << totalReadingms << " ms" << endl;
+	
+    string iprocessing_type;
+    cout << "Enter operation (edgedetection, brighten, rotate, reflect):" << endl;
+    cin >> iprocessing_type;
   
+    for (size_t i = 0; i < iprocessing_type.length(); i++) {
+        iprocessing_type[i] = tolower(iprocessing_type[i]);
+    }
+  
+    vector<vector<int>> result(rows, vector<int>(columns, 0));
+  
+    auto startProcessing = std::chrono::high_resolution_clock::now();
 
-  stringstream ss;
+    // Multi-threaded calculation engine
+    #pragma omp parallel for collapse(2)
+    for (int x = 1; x <= rows; x++) {
+        for (int y = 1; y <= columns; y++) {
+            if (iprocessing_type == "edgedetection") {
+                result[x - 1][y - 1] = round(applyConvolution(pixels, x, y));
+            }
+            else if (iprocessing_type == "brighten") {
+                int r = round((pixels[x][y]) * 1.5);
+                result[x - 1][y - 1] = (r > 255) ? 255 : r;
+            }
+            else if (iprocessing_type == "rotate") {
+                result[x - 1][y - 1] = pixels[rows - x + 1][columns - y + 1];
+            }
+            else if (iprocessing_type == "reflect") {
+                result[x - 1][y - 1] = pixels[x][columns - y + 1];
+            }
+        }
+    }
+  
+    auto stopProcessing = std::chrono::high_resolution_clock::now();
+    double totalms = std::chrono::duration_cast<std::chrono::nanoseconds>(stopProcessing - startProcessing).count() / 1e+6;
+    cout << "Total time processing image: " << totalms << " ms" << endl;
+ 
+    int maxGreyValue = 0;  
+    for (const auto& r : result) {
+        for (int pixel : r) {
+            if (pixel > maxGreyValue) maxGreyValue = pixel;
+        }
+    }
+  
+    // We export as P2 so you can inspect the output pixels inside a standard text editor if needed
+    string outHeader = "P2\n" + comment + "\n" + dimensions + "\n" + to_string(maxGreyValue) + "\n";
 
-  ss << maxGreyValue;
+    if (writeResults(outHeader, result)) {
+        cout << "File saved successfully as 'imageprocessed.pgm'!" << endl;
+    }
 
-  string strMGV = ss.str();
-  header = magic + "\n" + comment + "\n" + dimensions + "\n" + strMGV + "\n";
-
-  writeResults(header, results);
-} 
-
-
-
+    return 0;
+}
