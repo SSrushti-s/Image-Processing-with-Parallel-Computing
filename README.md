@@ -1,16 +1,15 @@
 # Image-Processing
 
-* C++ coding algorithms behind convolution filters, luminosity, rotation, reflection etc. in Image Processing applications  from scratch.
+This project demonstrates Parallel Image processing in C++.
 
-* This was a class project for a High Performance Computing class that I am taking that I found really interesting and decided to explore further.
+It accepts the path to an input image and performs one of the 4 user-selected operations - 
+* Edge detection
+* Reflection
+* Rotation
+* Brightening
 
-* The main focus of the project was to investigate how parallel programming with OpenMp optimizes such tasks, especially where large images are involved.
+The processed output is stored in imageproccessing_Output.pgm
 
-* I compiled and executed the program via a virtual GPU powered computer (virtual computer lab environment) provided by my school for HPC students. 
+This application uses **PGM (Portable GrayMap)** format for both input and output. This avoids the processing overhead of image compression algorithms, keeping the focus strictly on parallel execution performance.
 
-* Tested out the code on a picture taken somewhere in my school named 'GVSU.pgm'
-
-* The algorithm uses C++ vectors to represent 1D and 2D dimension arrays used for storage and manipulation of image pixels.
-
-* The results can be found on the Imageprocessing_Output.pdf folder.
-
+The program also outputs the total time taken for reading and processing the image in the terminal.
